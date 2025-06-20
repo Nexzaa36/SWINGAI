@@ -46,6 +46,10 @@ def check_breakout_criteria(df):
     if df is None or len(df) < 21:
         return False, None
 
+    df = df.dropna()  # <-- Drop rows with any NaN
+    if df.empty or len(df) < 21:
+        return False, None
+
     today = df.iloc[-1]
     prev = df.iloc[-2]
 
@@ -55,12 +59,12 @@ def check_breakout_criteria(df):
     c3 = today['Close'] > today['Open']
     c4 = today['Close'] > prev['High']
     c5 = today['Range'] < 1.5 * today['Range_SMA_20']
-    c6 = today['Close'] >= df['Close'][-20:].min()
+    c6 = today['Close'] >= df['Close'].iloc[-20:].min()
 
     if all([c1, c2, c3, c4, c5, c6]):
         entry = today['Close']
-        sl = round(entry * (1 - MAX_RISK_PCT / 100), 2)
-        target = round(entry + RR_RATIO * (entry - sl), 2)
+        sl = round(entry * 0.98, 2)  # 2% SL
+        target = round(entry + (entry - sl) * RR_RATIO, 2)
         return True, {"entry": entry, "sl": sl, "target": target}
     return False, None
 
