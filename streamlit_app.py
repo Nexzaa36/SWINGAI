@@ -1,12 +1,12 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 import plotly.graph_objects as go
 
 # ---------------------- SETTINGS ----------------------
 RR_RATIO = st.sidebar.selectbox("Select Reward-to-Risk Ratio", [2, 3, 4], index=1)
-strict_mode = st.sidebar.toggle("Strict Mode", value=True)
+strict_mode = st.sidebar.toggle("Strict Mode", value=False)
 
 # ---------------------- UI ----------------------
 st.title("📈 Swing Breakout Scanner")
@@ -17,18 +17,21 @@ st.markdown(f"### Swing Trade Setups for: {btest_date}")
 
 # ---------------------- STOCK UNIVERSE ----------------------
 from nse500list import NIFTY_500
+# For testing purposes:
+# NIFTY_500 = ["AUBANK.NS"]
 
 # ---------------------- SCANNER FUNCTION ----------------------
 def fetch_stock_data(symbol):
     try:
-        df = yf.download(symbol, start=btest_date - timedelta(days=60), end=btest_date + timedelta(days=1), interval="1d", progress=False)
+        df = yf.download(symbol, period="6mo", interval="1d", progress=False)
         df.dropna(inplace=True)
         df['EMA_5'] = df['Close'].ewm(span=5).mean()
         df['Volume_SMA_20'] = df['Volume'].rolling(20).mean()
         df['Range'] = df['High'] - df['Low']
         df['Range_SMA_20'] = df['Range'].rolling(20).mean()
         return df
-    except Exception:
+    except Exception as e:
+        st.error(f"Error fetching {symbol}: {e}")
         return None
 
 def check_breakout_criteria(df):
@@ -39,31 +42,27 @@ def check_breakout_criteria(df):
     if df.empty or len(df) < 21:
         return False, None
 
-    today = df[df.index == pd.to_datetime(btest_date)]
-    if today.empty:
-        return False, None
-
-    today = today.iloc[0]
-    prev_idx = df.index.get_loc(pd.to_datetime(btest_date)) - 1
-    if prev_idx < 0:
-        return False, None
-    prev = df.iloc[prev_idx]
+    today = df.iloc[-1]
+    prev = df.iloc[-2]
 
     try:
         c1 = today['Close'] > today['EMA_5']
-        c2 = today['Volume'] > (today['Volume_SMA_20'] * (1.5 if strict_mode else 1.0))
+        c2 = today['Volume'] > (today['Volume_SMA_20'] * (1.1 if strict_mode else 0.9))
         c3 = today['Close'] > today['Open']
         c4 = today['Close'] > prev['High']
-        c5 = today['Range'] < 1.5 * today['Range_SMA_20']
-        c6 = today['Close'] >= df['Close'].iloc[max(0, prev_idx - 19):prev_idx + 1].min()
+        c5 = today['Range'] < 2 * today['Range_SMA_20']
+        c6 = today['Close'] >= df['Close'].iloc[-20:].min()
+
+        st.write(f"{df.name}: C1={c1}, C2={c2}, C3={c3}, C4={c4}, C5={c5}, C6={c6}")
 
         if all([c1, c2, c3, c4, c5, c6]):
             entry = today['Close']
             sl = round(entry * 0.98, 2)
             target = round(entry + (entry - sl) * RR_RATIO, 2)
-            return True, {"entry": entry, "sl": sl, "target": target, "symbol": df.name, "date": btest_date}
+            return True, {"entry": entry, "sl": sl, "target": target, "symbol": df.name, "date": df.index[-1]}
         return False, None
-    except:
+    except Exception as e:
+        st.error(f"Error evaluating conditions for {df.name}: {e}")
         return False, None
 
 # ---------------------- SCAN ----------------------
