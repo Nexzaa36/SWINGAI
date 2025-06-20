@@ -74,12 +74,16 @@ capital = st.number_input("Enter your capital (₹)", min_value=1000, value=1700
 risk_pct = st.selectbox("Risk per trade (%)", [1, 2], index=1)
 rr_ratio = st.selectbox("Reward-to-Risk Ratio", [2, 3, 4], index=2)
 
-st.subheader("Today's Swing Trade Setups")
+# Backtest date selection
+st.subheader("📅 Select Date for Scanning")
+btest_date = st.date_input("Choose a date (today or past):", datetime.now().date())
 
-# Date logic: run only during 10-11 AM IST or for backtesting
-today = datetime.now().date()
+# Date logic based on user input
+today = btest_date
 start = today - timedelta(days=30)
-end = datetime.now()
+end = today + timedelta(days=1)  # include selected day
+
+st.subheader("Swing Trade Setups for: " + str(today))
 
 results = []
 
@@ -102,4 +106,4 @@ if results:
     df_results = pd.DataFrame(results)
     st.dataframe(df_results)
 else:
-    st.info("No trade setups today. Come back tomorrow between 10–11 AM 📆")
+    st.info("No trade setups for the selected date. Try another date 📆")
