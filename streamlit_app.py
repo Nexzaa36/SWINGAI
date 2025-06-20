@@ -47,23 +47,24 @@ def check_breakout_criteria(df):
 
     try:
         c1 = today['Close'] > today['EMA_5']
-        c2 = today['Volume'] > (today['Volume_SMA_20'] * (1.1 if strict_mode else 0.9))
+        c2 = today['Volume'] > (today['Volume_SMA_20'] * (1.5 if strict_mode else 1.0))
         c3 = today['Close'] > today['Open']
         c4 = today['Close'] > prev['High']
-        c5 = today['Range'] < 2 * today['Range_SMA_20']
+        c5 = today['Range'] < 1.5 * today['Range_SMA_20']
         c6 = today['Close'] >= df['Close'].iloc[-20:].min()
-
-        st.write(f"{df.name}: C1={c1}, C2={c2}, C3={c3}, C4={c4}, C5={c5}, C6={c6}")
 
         if all([c1, c2, c3, c4, c5, c6]):
             entry = today['Close']
             sl = round(entry * 0.98, 2)
             target = round(entry + (entry - sl) * RR_RATIO, 2)
-            return True, {"entry": entry, "sl": sl, "target": target, "symbol": df.name, "date": df.index[-1]}
-        return False, None
+            symbol = df.attrs.get("symbol", "Unknown")
+            return True, {"entry": entry, "sl": sl, "target": target, "symbol": symbol, "date": df.index[-1]}
+        else:
+            return False, None
+
     except Exception as e:
-       symbol = df.attrs.get("symbol", "Unknown")
-st.error(f"Error evaluating conditions for {symbol}: {e}")
+        symbol = df.attrs.get("symbol", "Unknown")
+        st.error(f"Error evaluating conditions for {symbol}: {e}")
         return False, None
 
 # ---------------------- SCAN ----------------------
