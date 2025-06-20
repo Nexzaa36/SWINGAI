@@ -35,7 +35,7 @@ def fetch_stock_data(symbol):
         st.error(f"Error fetching {symbol}: {e}")
         return None
 
-ef check_breakout_criteria(df):
+def check_breakout_criteria(df):
     if df is None or len(df) < 21:
         return False, None
 
