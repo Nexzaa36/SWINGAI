@@ -50,7 +50,7 @@ def check_breakout_criteria(df):
         c2 = today['Volume'] > (today['Volume_SMA_20'] * (1.5 if strict_mode else 1.0))
         c3 = today['Close'] > today['Open']
         c4 = today['Close'] > prev['High']
-        c5 = today['Range'] < 1.5 * today['Range_SMA_20']
+        c5 = today['Range'] < 1.5 * df['Range_SMA_20'].iloc[-1]   # ✅ FIXED
         c6 = today['Close'] >= df['Close'].iloc[-20:].min()
 
         if all([c1, c2, c3, c4, c5, c6]):
@@ -58,9 +58,14 @@ def check_breakout_criteria(df):
             sl = round(entry * 0.98, 2)
             target = round(entry + (entry - sl) * RR_RATIO, 2)
             symbol = df.attrs.get("symbol", "Unknown")
-            return True, {"entry": entry, "sl": sl, "target": target, "symbol": symbol, "date": df.index[-1]}
-        else:
-            return False, None
+            return True, {
+                "entry": entry,
+                "sl": sl,
+                "target": target,
+                "symbol": symbol,
+                "date": df.index[-1]
+            }
+        return False, None
 
     except Exception as e:
         symbol = df.attrs.get("symbol", "Unknown")
