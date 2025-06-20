@@ -17,10 +17,10 @@ st.markdown(f"### Swing Trade Setups for: {btest_date}")
 
 # ---------------------- STOCK UNIVERSE ----------------------
 from nse500list import NIFTY_500
-# For testing purposes:
+# For testing only:
 # NIFTY_500 = ["AUBANK.NS"]
 
-# ---------------------- SCANNER FUNCTION ----------------------
+# ---------------------- FUNCTIONS ----------------------
 def fetch_stock_data(symbol):
     try:
         df = yf.download(symbol, period="6mo", interval="1d", progress=False)
@@ -29,6 +29,7 @@ def fetch_stock_data(symbol):
         df['Volume_SMA_20'] = df['Volume'].rolling(20).mean()
         df['Range'] = df['High'] - df['Low']
         df['Range_SMA_20'] = df['Range'].rolling(20).mean()
+        df.dropna(inplace=True)
         return df
     except Exception as e:
         st.error(f"Error fetching {symbol}: {e}")
@@ -50,7 +51,7 @@ def check_breakout_criteria(df):
         c2 = today['Volume'] > (today['Volume_SMA_20'] * (1.5 if strict_mode else 1.0))
         c3 = today['Close'] > today['Open']
         c4 = today['Close'] > prev['High']
-        c5 = today['Range'] < 1.5 * df['Range_SMA_20'].iloc[-1]   # ✅ FIXED
+        c5 = today['Range'] < 1.5 * df['Range_SMA_20'].iloc[-1]
         c6 = today['Close'] >= df['Close'].iloc[-20:].min()
 
         if all([c1, c2, c3, c4, c5, c6]):
@@ -74,26 +75,36 @@ def check_breakout_criteria(df):
 
 # ---------------------- SCAN ----------------------
 results = []
-with st.spinner("Scanning NIFTY 500 stocks..."):
+with st.spinner("🔍 Scanning NIFTY 500 stocks..."):
     for stock in NIFTY_500:
         data = fetch_stock_data(stock)
         if data is not None:
+            # 🔎 Only include candles up to selected date
+            data = data[data.index <= pd.to_datetime(btest_date)]
+            if data.empty or len(data) < 21:
+                continue
+
             data.attrs["symbol"] = stock
             valid, levels = check_breakout_criteria(data)
             if valid:
-                risk = (levels['entry'] - levels['sl']) * (risk_pct / 100 * capital) / (levels['entry'] - levels['sl'])
-                levels['qty'] = int((risk_pct / 100 * capital) / (levels['entry'] - levels['sl']))
+                risk_amount = (risk_pct / 100) * capital
+                risk_per_share = levels['entry'] - levels['sl']
+                if risk_per_share == 0:
+                    continue  # prevent division by zero
+                qty = int(risk_amount / risk_per_share)
+                levels['qty'] = qty
                 results.append(levels)
 
 # ---------------------- RESULTS ----------------------
 if results:
-    st.success(f"Found {len(results)} trade setup(s)")
+    st.success(f"✅ Found {len(results)} trade setup(s)")
     df_results = pd.DataFrame(results)
     st.dataframe(df_results[['symbol', 'entry', 'sl', 'target', 'qty']])
 
     for res in results:
         df = fetch_stock_data(res['symbol'])
         if df is not None:
+            df = df[df.index <= pd.to_datetime(btest_date)]
             fig = go.Figure()
             fig.add_trace(go.Candlestick(
                 x=df.index[-50:],
@@ -103,9 +114,27 @@ if results:
                 close=df['Close'][-50:],
                 name="Candles"
             ))
-            fig.add_hline(y=res['entry'], line_dash="dash", line_color="blue", annotation_text="Entry")
-            fig.add_hline(y=res['sl'], line_dash="dot", line_color="red", annotation_text="SL")
-            fig.add_hline(y=res['target'], line_dash="dot", line_color="green", annotation_text="Target")
+            # Horizontal lines for entry/SL/target
+            for level, color, label in zip(
+                [res['entry'], res['sl'], res['target']],
+                ["blue", "red", "green"],
+                ["Entry", "SL", "Target"]
+            ):
+                fig.add_shape(
+                    type="line",
+                    x0=df.index[-50],
+                    x1=df.index[-1],
+                    y0=level,
+                    y1=level,
+                    line=dict(color=color, dash="dot"),
+                )
+                fig.add_annotation(
+                    x=df.index[-1], y=level,
+                    text=label,
+                    showarrow=False,
+                    yshift=10 if label == "Entry" else -10,
+                    font=dict(color=color)
+                )
             st.plotly_chart(fig)
 else:
-    st.warning("No trade setups for the selected date. Try another date 📆")
+    st.warning("⚠️ No valid trade setups for the selected date. Try changing the date.")
