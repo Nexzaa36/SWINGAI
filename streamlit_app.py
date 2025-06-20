@@ -21,7 +21,7 @@ from nse500list import NIFTY_500
 # ---------------------- SCANNER FUNCTION ----------------------
 def fetch_stock_data(symbol):
     try:
-        df = yf.download(symbol, period="6mo", interval="1d", progress=False)
+        df = yf.download(symbol, start=btest_date - timedelta(days=60), end=btest_date + timedelta(days=1), interval="1d", progress=False)
         df.dropna(inplace=True)
         df['EMA_5'] = df['Close'].ewm(span=5).mean()
         df['Volume_SMA_20'] = df['Volume'].rolling(20).mean()
@@ -31,7 +31,6 @@ def fetch_stock_data(symbol):
     except Exception:
         return None
 
-
 def check_breakout_criteria(df):
     if df is None or len(df) < 21:
         return False, None
@@ -40,8 +39,15 @@ def check_breakout_criteria(df):
     if df.empty or len(df) < 21:
         return False, None
 
-    today = df.iloc[-1]
-    prev = df.iloc[-2]
+    today = df[df.index == pd.to_datetime(btest_date)]
+    if today.empty:
+        return False, None
+
+    today = today.iloc[0]
+    prev_idx = df.index.get_loc(pd.to_datetime(btest_date)) - 1
+    if prev_idx < 0:
+        return False, None
+    prev = df.iloc[prev_idx]
 
     try:
         c1 = today['Close'] > today['EMA_5']
@@ -49,17 +55,16 @@ def check_breakout_criteria(df):
         c3 = today['Close'] > today['Open']
         c4 = today['Close'] > prev['High']
         c5 = today['Range'] < 1.5 * today['Range_SMA_20']
-        c6 = today['Close'] >= df['Close'].iloc[-20:].min()
+        c6 = today['Close'] >= df['Close'].iloc[max(0, prev_idx - 19):prev_idx + 1].min()
 
         if all([c1, c2, c3, c4, c5, c6]):
             entry = today['Close']
             sl = round(entry * 0.98, 2)
             target = round(entry + (entry - sl) * RR_RATIO, 2)
-            return True, {"entry": entry, "sl": sl, "target": target, "symbol": df.name, "date": df.index[-1]}
+            return True, {"entry": entry, "sl": sl, "target": target, "symbol": df.name, "date": btest_date}
         return False, None
     except:
         return False, None
-
 
 # ---------------------- SCAN ----------------------
 results = []
