@@ -35,7 +35,7 @@ def fetch_stock_data(symbol):
         st.error(f"Error fetching {symbol}: {e}")
         return None
 
-def check_breakout_criteria(df):
+ef check_breakout_criteria(df):
     if df is None or len(df) < 21:
         return False, None
 
@@ -43,16 +43,17 @@ def check_breakout_criteria(df):
     if df.empty or len(df) < 21:
         return False, None
 
-    today = df.iloc[-1]
-    prev = df.iloc[-2]
-
     try:
+        # Ensure scalar values (not Series with duplicate index)
+        today = df.iloc[-1].copy()
+        prev = df.iloc[-2].copy()
+
         c1 = today['Close'] > today['EMA_5']
         c2 = today['Volume'] > (today['Volume_SMA_20'] * (1.5 if strict_mode else 1.0))
         c3 = today['Close'] > today['Open']
         c4 = today['Close'] > prev['High']
         c5 = today['Range'] < 1.5 * df['Range_SMA_20'].iloc[-1]
-        c6 = today['Close'] >= df['Close'].iloc[-20:].min()
+        c6 = float(today['Close']) >= float(df['Close'].iloc[-20:].min())
 
         if all([c1, c2, c3, c4, c5, c6]):
             entry = today['Close']
