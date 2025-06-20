@@ -62,7 +62,8 @@ def check_breakout_criteria(df):
             return True, {"entry": entry, "sl": sl, "target": target, "symbol": df.name, "date": df.index[-1]}
         return False, None
     except Exception as e:
-        st.error(f"Error evaluating conditions for {df.name}: {e}")
+       symbol = df.attrs.get("symbol", "Unknown")
+st.error(f"Error evaluating conditions for {symbol}: {e}")
         return False, None
 
 # ---------------------- SCAN ----------------------
@@ -71,7 +72,7 @@ with st.spinner("Scanning NIFTY 500 stocks..."):
     for stock in NIFTY_500:
         data = fetch_stock_data(stock)
         if data is not None:
-            data.name = stock
+            data.attrs["symbol"] = stock
             valid, levels = check_breakout_criteria(data)
             if valid:
                 risk = (levels['entry'] - levels['sl']) * (risk_pct / 100 * capital) / (levels['entry'] - levels['sl'])
