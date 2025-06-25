@@ -4,7 +4,6 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 
-# Define stock watchlist and trade parameters
 stocks = {
     "KPITTECH.NS": {
         "entry_min": 1320,
@@ -22,42 +21,45 @@ stocks = {
     }
 }
 
-# Function to scan and display alerts
 def run_swing_scanner():
-    end = datetime.today()
-    start = end - timedelta(days=30)
-
     st.title("📈 Swing Trade Alert System (2–4 Days)")
     st.caption("Live scanner for breakout stocks like KPITTECH & INDUSTOWER")
 
+    end = datetime.today()
+    start = end - timedelta(days=30)
+
     for symbol, config in stocks.items():
         st.subheader(f"{symbol}")
-        df = yf.download(symbol, start=start, end=end)
 
-        if df.empty:
-            st.error("❌ No data found. Check symbol or connection.")
-            continue
+        try:
+            df = yf.download(symbol, start=start, end=end)
+            if df.empty:
+                st.error(f"⚠️ No data found for {symbol}. Possibly a connection or symbol issue.")
+                continue
 
-        df['20_day_avg_vol'] = df['Volume'].rolling(window=20).mean()
-        latest = df.iloc[-1]
+            df['20_day_avg_vol'] = df['Volume'].rolling(window=20).mean()
+            latest = df.iloc[-1]
 
-        trigger = (
-            config['entry_min'] <= latest['Close'] <= config['entry_max']
-            and latest['Volume'] > 1.5 * latest['20_day_avg_vol']
-        )
+            trigger = (
+                config['entry_min'] <= latest['Close'] <= config['entry_max']
+                and latest['Volume'] > 1.5 * latest['20_day_avg_vol']
+            )
 
-        st.write(f"**Current Price:** ₹{latest['Close']:.2f}")
-        st.write(f"**Volume:** {int(latest['Volume'])}, **Avg Vol (20D):** {int(latest['20_day_avg_vol'])}")
+            st.write(f"**Current Price:** ₹{latest['Close']:.2f}")
+            st.write(f"**Volume:** {int(latest['Volume'])}, **Avg Vol (20D):** {int(latest['20_day_avg_vol'])}")
 
-        if trigger:
-            st.success("✅ Entry Conditions Met! Possible swing setup.")
-            st.markdown(f"**Entry Zone**: ₹{config['entry_min']} – ₹{config['entry_max']}")
-            st.markdown(f"**Target 1**: ₹{config['target1']}, **Target 2**: ₹{config['target2']}")
-            st.markdown(f"**Stop Loss**: ₹{config['stop_loss']}")
-        else:
-            st.warning("⚠️ Entry conditions **not met** yet.")
+            if trigger:
+                st.success("✅ Entry Conditions Met! Possible swing setup.")
+                st.markdown(f"**Entry Zone**: ₹{config['entry_min']} – ₹{config['entry_max']}")
+                st.markdown(f"**Target 1**: ₹{config['target1']}, **Target 2**: ₹{config['target2']}")
+                st.markdown(f"**Stop Loss**: ₹{config['stop_loss']}")
+            else:
+                st.warning("⚠️ Entry conditions **not met** yet.")
 
-        st.line_chart(df[['Close']].tail(30))
+            st.line_chart(df[['Close']].tail(30))
 
-# Run once on load
+        except Exception as e:
+            st.error(f"❌ Error loading {symbol}: {e}")
+
+# Run the scanner
 run_swing_scanner()
