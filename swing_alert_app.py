@@ -3,8 +3,6 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
-import schedule
-import time
 
 # Define stock watchlist and trade parameters
 stocks = {
@@ -26,27 +24,23 @@ stocks = {
 
 # Function to scan and display alerts
 def run_swing_scanner():
-    # Set date range for historical data
     end = datetime.today()
     start = end - timedelta(days=30)
 
-    # Load data and analyze
     st.title("📈 Swing Trade Alert System (2–4 Days)")
-    st.caption("Live scanner for winning breakout stocks like KPITTECH & INDUSTOWER")
+    st.caption("Live scanner for breakout stocks like KPITTECH & INDUSTOWER")
 
     for symbol, config in stocks.items():
         st.subheader(f"{symbol}")
         df = yf.download(symbol, start=start, end=end)
 
         if df.empty:
-            st.error("No data found. Check symbol or internet connection.")
+            st.error("❌ No data found. Check symbol or connection.")
             continue
 
-        # Calculate 20-day average volume
         df['20_day_avg_vol'] = df['Volume'].rolling(window=20).mean()
-
-        # Trigger condition: price in entry zone + volume > 1.5x avg
         latest = df.iloc[-1]
+
         trigger = (
             config['entry_min'] <= latest['Close'] <= config['entry_max']
             and latest['Volume'] > 1.5 * latest['20_day_avg_vol']
@@ -65,13 +59,5 @@ def run_swing_scanner():
 
         st.line_chart(df[['Close']].tail(30))
 
-# Run scanner
+# Run once on load
 run_swing_scanner()
-
-# Optional: schedule daily auto-refresh (commented out unless used in script automation)
-# def scheduled_job():
-#     run_swing_scanner()
-# schedule.every().day.at("10:00").do(scheduled_job)
-# while True:
-#     schedule.run_pending()
-#     time.sleep(60)
